@@ -1,0 +1,16 @@
+# Build output
+build/
+dist/
+
+# Local development notes (host-specific paths, personal install locations)
+DEVELOPMENT_CONTEXT.md
+
+# macOS Finder
+.DS_Store
+
+# Swift / Xcode (not used here but kept for safety)
+.build/
+xcuserdata/
+*.hmap
+*.dSYM
+*.dSYM.zip
