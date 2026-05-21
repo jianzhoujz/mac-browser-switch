@@ -62,6 +62,15 @@ private enum BrowserCatalog {
         "com.apple.systempreferences"
     ]
 
+    /// URL schemes that betray a non-browser app (terminals, IDEs). A real web
+    /// browser never registers itself as an SSH/SFTP/Telnet handler, so any
+    /// app declaring one of these is excluded even if it also claims `https`.
+    /// Example: Kitty declares http/https alongside ssh/sftp/telnet so it
+    /// appears in `urlsForApplications(toOpen:)` for https.
+    private static let nonBrowserSchemes: Set<String> = [
+        "ssh", "sftp", "telnet"
+    ]
+
     static func allBrowsers() -> [Browser] {
         let appURLs = NSWorkspace.shared.urlsForApplications(toOpen: httpsProbeURL)
 
@@ -127,6 +136,9 @@ private enum BrowserCatalog {
         guard let bundleID = bundle?.bundleIdentifier else {
             return nil
         }
+        if let bundle, declaresNonBrowserScheme(bundle: bundle) {
+            return nil
+        }
         let displayName =
             (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String) ??
             (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String) ??
@@ -144,6 +156,21 @@ private enum BrowserCatalog {
             version: version,
             icon: icon
         )
+    }
+
+    private static func declaresNonBrowserScheme(bundle: Bundle) -> Bool {
+        guard let urlTypes = bundle.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] else {
+            return false
+        }
+        for entry in urlTypes {
+            guard let schemes = entry["CFBundleURLSchemes"] as? [String] else {
+                continue
+            }
+            for scheme in schemes where nonBrowserSchemes.contains(scheme.lowercased()) {
+                return true
+            }
+        }
+        return false
     }
 }
 
