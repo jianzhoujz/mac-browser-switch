@@ -346,10 +346,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 self?.log("set default succeeded bundleID=\(browser.bundleID)")
             }
-            // Re-query LaunchServices rather than trusting `browser` — the user
-            // may have cancelled the system confirmation dialog, in which case
-            // the default is unchanged and the menu bar icon should stay put.
-            self?.refreshStatusItemIcon(default: BrowserCatalog.currentDefault())
+            // The LSDatabase write often lands AFTER setDefaultApplication's
+            // callback fires, so a single re-query here usually still returns
+            // the old default. Poll for up to 1 second; the first observed
+            // change repaints the icon and `lastRenderedDefaultBundleID`
+            // dedupes the remaining ticks. If the user cancelled the system
+            // confirmation, every tick reads the old value and is a no-op.
+            // Re-query rather than trusting `browser` — same reason: cancel
+            // must leave the icon untouched.
+            for delay in stride(from: 0.0, through: 1.0, by: 0.2) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    self?.refreshStatusItemIcon(default: BrowserCatalog.currentDefault())
+                }
+            }
         }
     }
 
