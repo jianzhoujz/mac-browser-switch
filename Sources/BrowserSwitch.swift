@@ -346,19 +346,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 self?.log("set default succeeded bundleID=\(browser.bundleID)")
             }
-            // The LSDatabase write often lands AFTER setDefaultApplication's
-            // callback fires, so a single re-query here usually still returns
-            // the old default. Poll for up to 1 second; the first observed
-            // change repaints the icon and `lastRenderedDefaultBundleID`
-            // dedupes the remaining ticks. If the user cancelled the system
-            // confirmation, every tick reads the old value and is a no-op.
-            // Re-query rather than trusting `browser` — same reason: cancel
-            // must leave the icon untouched.
-            for delay in stride(from: 0.0, through: 1.0, by: 0.2) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    self?.refreshStatusItemIcon(default: BrowserCatalog.currentDefault())
-                }
-            }
+            // setDefaultApplication's callback fires BEFORE the user
+            // dismisses the system confirmation dialog — its `error` is
+            // also unreliable (often "The file couldn't be opened." even
+            // when the switch eventually succeeds). The actual LSDatabase
+            // write happens whenever the user clicks "Use" in the dialog,
+            // which can be many seconds later. Poll for up to 10 seconds
+            // and stop as soon as LSDatabase reports a different default.
+            // If the user cancelled, every read returns the old value and
+            // the polling expires with no visible change.
+            self?.pollForDefaultBrowserChange(deadline: Date().addingTimeInterval(10))
+        }
+    }
+
+    private func pollForDefaultBrowserChange(deadline: Date) {
+        let current = BrowserCatalog.currentDefault()
+        let changed = current?.bundleID != lastRenderedDefaultBundleID
+        refreshStatusItemIcon(default: current)
+        if changed { return }
+        if Date() >= deadline { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            self?.pollForDefaultBrowserChange(deadline: deadline)
         }
     }
 
