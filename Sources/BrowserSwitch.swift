@@ -346,10 +346,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             } else {
                 self?.log("set default succeeded bundleID=\(browser.bundleID)")
             }
+            // Re-query LaunchServices rather than trusting `browser` — the user
+            // may have cancelled the system confirmation dialog, in which case
+            // the default is unchanged and the menu bar icon should stay put.
+            self?.refreshStatusItemIcon(default: BrowserCatalog.currentDefault())
         }
-        // No menu refresh here — `menuWillOpen` re-reads the default the next
-        // time the user opens the menu, which is after the system confirmation
-        // dialog is dismissed.
     }
 
     @objc private func toggleLaunchAtLogin() {
